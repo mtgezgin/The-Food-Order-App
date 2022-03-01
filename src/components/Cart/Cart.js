@@ -4,9 +4,13 @@ import CartContext from "../../store/cart-context";
 import classes from "./Cart.module.css";
 import CartItem from "./CartItem";
 import Checkout from "./Checkout";
+import axios from "axios";
+import { database } from "../../config/database";
 
 const Cart = (props) => {
   const [isCheckout, setIsCheckout] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [didSubmit, setDidSubmit] = useState(false);
   const cartContext = useContext(CartContext);
   const totalAmount = `$${cartContext.totalAmount.toFixed(2)}`;
   const hasItems = cartContext.items.length > 0;
@@ -21,6 +25,21 @@ const Cart = (props) => {
 
   const orderHandler = () => {
     setIsCheckout(true);
+  };
+
+  const submitOrderHandler = async (userData) => {
+    setIsSubmitting(true);
+    try {
+      await axios.post(`${database}/orders.json`, {
+        user: userData,
+        orderedItems: cartContext.items,
+      });
+    } catch (error) {
+      console.log("Error: ", error);
+    }
+    setIsSubmitting(false);
+    setDidSubmit(true);
+    cartContext.clearItems();
   };
 
   const cartItems = (
@@ -50,15 +69,40 @@ const Cart = (props) => {
       )}
     </div>
   );
-  return (
-    <Modal onClose={props.onClose}>
+
+  const cartModalContent = (
+    <>
       {cartItems}
       <div className={classes.total}>
         <span>Total Amount</span>
         <span>{totalAmount}</span>
       </div>
-      {isCheckout && <Checkout onCancel={props.onClose} />}
+      {isCheckout && (
+        <Checkout onConfirm={submitOrderHandler} onCancel={props.onClose} />
+      )}
       {!isCheckout && modalActions}
+    </>
+  );
+
+  const isSubmittingModalContent = <p>Sending Order Data...</p>;
+
+  const submitSuccessModalContent = (
+    <>
+      <p>Successfully sent the order.</p>
+      <p>Thank you for your order!</p>
+      <div className={classes.actions}>
+        <button className={classes.button} onClick={props.onClose}>
+          Close
+        </button>
+      </div>
+    </>
+  );
+
+  return (
+    <Modal onClose={props.onClose}>
+      {!isSubmitting && !didSubmit && cartModalContent}
+      {isSubmitting && isSubmittingModalContent}
+      {didSubmit && !isSubmitting && submitSuccessModalContent}
     </Modal>
   );
 };
